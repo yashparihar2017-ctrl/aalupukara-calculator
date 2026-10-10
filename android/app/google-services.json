@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "658556847752",
+    "project_id": "aalupukara-1c043",
+    "storage_bucket": "aalupukara-1c043.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:658556847752:android:af11a584106267ab0ac13d",
+        "android_client_info": {
+          "package_name": "com.yash.secretapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcS7mCDCE8IjYB2CDsNs3aM8CN32a7j2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
