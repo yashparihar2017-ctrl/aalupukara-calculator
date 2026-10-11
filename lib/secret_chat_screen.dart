@@ -66,9 +66,10 @@ class _SecretChatScreenState extends State<SecretChatScreen>
         .doc(_roomId)
         .snapshots()
         .listen((doc) {
-          if (doc.exists && context.mounted) {
+          if (doc.exists && mounted) {
+            var data = doc.data() as Map<String, dynamic>;
             setState(() {
-              _selectedAutoDeleteTime = doc.data()?['autoDeleteTime'] ?? 0;
+              _selectedAutoDeleteTime = data['autoDeleteTime'] ?? 0;
             });
           }
         });
@@ -80,8 +81,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
         .doc(widget.currentUser)
         .get();
 
-    // FIX: Strictly using context.mounted to avoid async gap warnings
-    if (!context.mounted) {
+    if (!mounted) {
       return;
     }
 
@@ -101,7 +101,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF2C2C2C),
         title: const Text("Edit Name", style: TextStyle(color: Colors.white)),
         content: TextField(
@@ -120,7 +120,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
@@ -134,15 +134,17 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                       'savedContactName': newName,
                     }, SetOptions(merge: true));
 
-                // FIX: Strictly using context.mounted here as well
-                if (!context.mounted) {
+                if (!mounted) {
                   return;
                 }
 
                 setState(() {
                   _customDisplayName = newName;
                 });
-                Navigator.pop(context);
+
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
               }
             },
             child: const Text(
@@ -163,8 +165,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
         .doc(widget.currentUser)
         .set({'notificationsEnabled': newState}, SetOptions(merge: true));
 
-    // FIX: Strictly using context.mounted
-    if (!context.mounted) {
+    if (!mounted) {
       return;
     }
 
@@ -251,7 +252,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
   void _clearEntireChat() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF2C2C2C),
         title: const Text("Clear Chat?", style: TextStyle(color: Colors.white)),
         content: const Text(
@@ -260,12 +261,12 @@ class _SecretChatScreenState extends State<SecretChatScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               var snapshots = await FirebaseFirestore.instance
                   .collection('secret_messages')
                   .get();
@@ -294,11 +295,10 @@ class _SecretChatScreenState extends State<SecretChatScreen>
         maxWidth: 800,
       );
     } catch (e) {
-      // Ignore
+      // Ignored for production
     }
 
-    // FIX: Using context.mounted for all async gaps in this method
-    if (!context.mounted) {
+    if (!mounted) {
       return;
     }
     setState(() => _isPickingImage = false);
@@ -313,7 +313,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
       List<int> imageBytes = await image.readAsBytes();
       String base64Image = base64Encode(imageBytes);
 
-      if (!context.mounted) {
+      if (!mounted) {
         return;
       }
 
@@ -336,7 +336,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
       });
       setState(() => _replyingTo = null);
     } catch (e) {
-      if (!context.mounted) {
+      if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context)
@@ -351,7 +351,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (BuildContext sheetContext) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -366,7 +366,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _pickAndUploadImage(ImageSource.camera);
                 },
               ),
@@ -380,7 +380,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _pickAndUploadImage(ImageSource.gallery);
                 },
               ),
@@ -420,7 +420,6 @@ class _SecretChatScreenState extends State<SecretChatScreen>
   }
 
   void _showMessageMenu(
-    BuildContext context,
     Offset offset,
     String docId,
     String currentText,
@@ -471,6 +470,10 @@ class _SecretChatScreenState extends State<SecretChatScreen>
       ],
     );
 
+    if (!mounted) {
+      return;
+    }
+
     if (action == 'reply') {
       setState(() => _replyingTo = {'id': docId, 'text': currentText});
     } else if (action == 'edit') {
@@ -497,11 +500,11 @@ class _SecretChatScreenState extends State<SecretChatScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E1E1E),
-      builder: (context) {
+      builder: (BuildContext sheetContext) {
         return ListView.builder(
           shrinkWrap: true,
           itemCount: _timeOptions.length,
-          itemBuilder: (context, index) {
+          itemBuilder: (BuildContext listContext, int index) {
             int time = _timeOptions[index];
             String label = time == 0 ? "Off" : "$time Seconds";
             return ListTile(
@@ -521,7 +524,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                     .collection('chat_settings')
                     .doc(_roomId)
                     .set({'autoDeleteTime': time});
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
               },
             );
           },
@@ -534,7 +537,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
     if (_isNotificationOn) {
       bool? confirm = await showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (BuildContext dialogContext) => AlertDialog(
           backgroundColor: const Color(0xFF2C2C2C),
           title: const Row(
             children: [
@@ -551,7 +554,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
             TextButton(
               onPressed: () {
                 _toggleNotification();
-                Navigator.of(context).pop(true);
+                Navigator.of(dialogContext).pop(true);
               },
               child: const Text(
                 "Turn OFF & Exit",
@@ -559,7 +562,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
               ),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text(
                 "Keep ON",
                 style: TextStyle(color: Colors.greenAccent),
@@ -619,62 +622,66 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                   .collection('users')
                   .doc(widget.peerUser)
                   .snapshots(),
-              builder: (context, snapshot) {
-                String status = "Offline";
-                bool isTyping = false;
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  var data = snapshot.data!.data() as Map<String, dynamic>;
-                  if (data['isTyping'] == true) {
-                    status = "typing ";
-                    isTyping = true;
-                  } else if (data['isOnline'] == true) {
-                    status = "Online";
-                  } else {
-                    Timestamp? lastSeen = data['lastSeen'];
-                    status = lastSeen != null
-                        ? "Last seen at ${_formatTimestamp(lastSeen)}"
-                        : "Offline";
-                  }
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _customDisplayName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    isTyping
-                        ? const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                "typing ",
+              builder:
+                  (
+                    BuildContext streamContext,
+                    AsyncSnapshot<DocumentSnapshot> snapshot,
+                  ) {
+                    String status = "Offline";
+                    bool isTyping = false;
+                    if (snapshot.hasData && snapshot.data!.exists) {
+                      var data = snapshot.data!.data() as Map<String, dynamic>;
+                      if (data['isTyping'] == true) {
+                        status = "typing";
+                        isTyping = true;
+                      } else if (data['isOnline'] == true) {
+                        status = "Online";
+                      } else {
+                        Timestamp? lastSeen = data['lastSeen'];
+                        status = lastSeen != null
+                            ? "Last seen at ${_formatTimestamp(lastSeen)}"
+                            : "Offline";
+                      }
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _customDisplayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        isTyping
+                            ? const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "typing ",
+                                    style: TextStyle(
+                                      color: Colors.greenAccent,
+                                      fontSize: 13,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                  TypingIndicator(),
+                                ],
+                              )
+                            : Text(
+                                status,
                                 style: TextStyle(
-                                  color: Colors.greenAccent,
-                                  fontSize: 13,
-                                  fontStyle: FontStyle.italic,
+                                  color: status == "Online"
+                                      ? Colors.greenAccent
+                                      : Colors.white54,
+                                  fontSize: 12,
                                 ),
                               ),
-                              TypingIndicator(),
-                            ],
-                          )
-                        : Text(
-                            status,
-                            style: TextStyle(
-                              color: status == "Online"
-                                  ? Colors.greenAccent
-                                  : Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                  ],
-                );
-              },
+                      ],
+                    );
+                  },
             ),
           ),
           actions: [
@@ -713,208 +720,222 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                       .collection('secret_messages')
                       .orderBy('timestamp', descending: true)
                       .snapshots(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData)
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.greenAccent,
-                        ),
-                      );
-
-                    var messages = snapshot.data!.docs;
-                    return ListView.builder(
-                      reverse: true,
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        var msg = messages[index];
-                        var docId = msg.id;
-                        var data = msg.data() as Map<String, dynamic>;
-
-                        bool isMe = data['sender'] == widget.currentUser;
-                        bool isSeen = data['isSeen'] ?? false;
-                        bool isEdited = data['isEdited'] ?? false;
-                        String? replyText = data['replyText'];
-                        String? imageBase64 = data['imageBase64'];
-                        int autoDelete = data['autoDeleteTime'] ?? 0;
-                        Timestamp? seenAt = data['seenAt'];
-
-                        String time = _formatTimestamp(
-                          data['timestamp'] as Timestamp?,
-                        );
-
-                        if (isSeen && autoDelete > 0 && seenAt != null) {
-                          DateTime seenTime = seenAt.toDate();
-                          DateTime deleteTime = seenTime.add(
-                            Duration(seconds: autoDelete),
+                  builder:
+                      (
+                        BuildContext streamContext,
+                        AsyncSnapshot<QuerySnapshot> snapshot,
+                      ) {
+                        if (!snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.greenAccent,
+                            ),
                           );
-
-                          if (DateTime.now().isAfter(deleteTime)) {
-                            msg.reference.delete();
-                          } else if (!_bombTimers.containsKey(docId)) {
-                            Duration remaining = deleteTime.difference(
-                              DateTime.now(),
-                            );
-                            _bombTimers[docId] = Timer(remaining, () {
-                              msg.reference.delete();
-                              _bombTimers.remove(docId);
-                            });
-                          }
                         }
 
-                        return GestureDetector(
-                          onLongPressStart: (details) => _showMessageMenu(
-                            context,
-                            details.globalPosition,
-                            docId,
-                            data['text'],
-                            isMe,
-                          ),
-                          child: Align(
-                            alignment: isMe
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(
-                                vertical: 4,
-                                horizontal: 14,
+                        var messages = snapshot.data!.docs;
+                        return ListView.builder(
+                          reverse: true,
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: messages.length,
+                          itemBuilder: (BuildContext listContext, int index) {
+                            var msg = messages[index];
+                            var docId = msg.id;
+                            var data = msg.data() as Map<String, dynamic>;
+
+                            bool isMe = data['sender'] == widget.currentUser;
+                            bool isSeen = data['isSeen'] ?? false;
+                            bool isEdited = data['isEdited'] ?? false;
+                            String? replyText = data['replyText'];
+                            String? imageBase64 = data['imageBase64'];
+                            int autoDelete = data['autoDeleteTime'] ?? 0;
+                            Timestamp? seenAt = data['seenAt'];
+
+                            String time = _formatTimestamp(
+                              data['timestamp'] as Timestamp?,
+                            );
+
+                            if (isSeen && autoDelete > 0 && seenAt != null) {
+                              DateTime seenTime = seenAt.toDate();
+                              DateTime deleteTime = seenTime.add(
+                                Duration(seconds: autoDelete),
+                              );
+
+                              if (DateTime.now().isAfter(deleteTime)) {
+                                msg.reference.delete();
+                              } else if (!_bombTimers.containsKey(docId)) {
+                                Duration remaining = deleteTime.difference(
+                                  DateTime.now(),
+                                );
+                                _bombTimers[docId] = Timer(remaining, () {
+                                  msg.reference.delete();
+                                  _bombTimers.remove(docId);
+                                });
+                              }
+                            }
+
+                            return GestureDetector(
+                              onLongPressStart: (details) => _showMessageMenu(
+                                details.globalPosition,
+                                docId,
+                                data['text'],
+                                isMe,
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isMe
-                                      ? [
-                                          const Color(0xFF007A5E),
-                                          const Color(0xFF005944),
-                                        ]
-                                      : [
-                                          const Color(0xFF2C2C2C),
-                                          const Color(0xFF1E1E1E),
-                                        ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(16),
-                                  topRight: const Radius.circular(16),
-                                  bottomLeft: isMe
-                                      ? const Radius.circular(16)
-                                      : const Radius.circular(4),
-                                  bottomRight: isMe
-                                      ? const Radius.circular(4)
-                                      : const Radius.circular(16),
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x4D000000),
-                                    blurRadius: 4,
-                                    offset: Offset(1, 2),
+                              child: Align(
+                                alignment: isMe
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                    horizontal: 14,
                                   ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: isMe
-                                    ? CrossAxisAlignment.end
-                                    : CrossAxisAlignment.start,
-                                children: [
-                                  if (replyText != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(bottom: 6),
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black38,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: const Border(
-                                          left: BorderSide(
-                                            color: Colors.greenAccent,
-                                            width: 4,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        replyText,
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 13,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isMe
+                                          ? [
+                                              const Color(0xFF007A5E),
+                                              const Color(0xFF005944),
+                                            ]
+                                          : [
+                                              const Color(0xFF2C2C2C),
+                                              const Color(0xFF1E1E1E),
+                                            ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-
-                                  if (imageBase64 != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 6),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Image.memory(
-                                          base64Decode(imageBase64),
-                                          width: 200,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(16),
+                                      topRight: const Radius.circular(16),
+                                      bottomLeft: isMe
+                                          ? const Radius.circular(16)
+                                          : const Radius.circular(4),
+                                      bottomRight: isMe
+                                          ? const Radius.circular(4)
+                                          : const Radius.circular(16),
                                     ),
-
-                                  if (data['text'] != '📸 Photo')
-                                    Text(
-                                      data['text'],
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x4D000000),
+                                        blurRadius: 4,
+                                        offset: Offset(1, 2),
                                       ),
-                                    ),
-
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (autoDelete > 0)
-                                        const Icon(
-                                          Icons.timer,
-                                          color: Colors.redAccent,
-                                          size: 10,
-                                        ),
-                                      if (autoDelete > 0)
-                                        const SizedBox(width: 4),
-                                      if (isEdited)
-                                        const Text(
-                                          "Edited • ",
-                                          style: TextStyle(
-                                            color: Colors.white54,
-                                            fontSize: 10,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        ),
-                                      Text(
-                                        time,
-                                        style: const TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                      if (isMe) const SizedBox(width: 4),
-                                      if (isMe)
-                                        Icon(
-                                          isSeen ? Icons.done_all : Icons.check,
-                                          size: 14,
-                                          color: isSeen
-                                              ? Colors.lightBlueAccent
-                                              : Colors.white54,
-                                        ),
                                     ],
                                   ),
-                                ],
+                                  child: Column(
+                                    crossAxisAlignment: isMe
+                                        ? CrossAxisAlignment.end
+                                        : CrossAxisAlignment.start,
+                                    children: [
+                                      if (replyText != null)
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black38,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: const Border(
+                                              left: BorderSide(
+                                                color: Colors.greenAccent,
+                                                width: 4,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            replyText,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 13,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+
+                                      if (imageBase64 != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            child: Image.memory(
+                                              base64Decode(imageBase64),
+                                              width: 200,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+
+                                      if (data['text'] != '📸 Photo')
+                                        Text(
+                                          data['text'],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (autoDelete > 0)
+                                            const Icon(
+                                              Icons.timer,
+                                              color: Colors.redAccent,
+                                              size: 10,
+                                            ),
+                                          if (autoDelete > 0)
+                                            const SizedBox(width: 4),
+                                          if (isEdited)
+                                            const Text(
+                                              "Edited • ",
+                                              style: TextStyle(
+                                                color: Colors.white54,
+                                                fontSize: 10,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          Text(
+                                            time,
+                                            style: const TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          if (isMe) const SizedBox(width: 4),
+                                          if (isMe)
+                                            Icon(
+                                              isSeen
+                                                  ? Icons.done_all
+                                                  : Icons.check,
+                                              size: 14,
+                                              color: isSeen
+                                                  ? Colors.lightBlueAccent
+                                                  : Colors.white54,
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
                 ),
               ),
 
@@ -1047,10 +1068,10 @@ class _TypingIndicatorState extends State<TypingIndicator>
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: List.generate(3, (index) {
+      children: List.generate(3, (int index) {
         return AnimatedBuilder(
           animation: _controller,
-          builder: (context, child) {
+          builder: (BuildContext buildContext, Widget? child) {
             double val = (_controller.value * 2 * math.pi) - (index * 1.0);
             double y = (math.sin(val) * 3).clamp(-3.0, 3.0);
             return Transform.translate(

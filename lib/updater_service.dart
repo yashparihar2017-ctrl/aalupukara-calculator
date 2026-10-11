@@ -10,23 +10,25 @@ import 'dart:io';
 class UpdaterService {
   static Future<void> checkForUpdate(BuildContext context) async {
     try {
-      // 1. Firebase se database ka data laao
       DocumentSnapshot snapshot = await FirebaseFirestore.instance
           .collection('app_info')
           .doc('update_data')
           .get();
 
-      if (!snapshot.exists) return; // Agar data nahi hai toh chup raho
+      if (!snapshot.exists) {
+        return;
+      }
 
       String latestVersionOnCloud = snapshot['latest_version'];
       String apkDownloadUrl = snapshot['apk_url'];
 
-      // 2. App ka current version check karo
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       String currentVersion = packageInfo.version;
 
-      // 3. Agar cloud par version change ho gaya hai, toh popup dikhao
       if (currentVersion != latestVersionOnCloud) {
+        if (!context.mounted) {
+          return;
+        }
         _showUpdatePopup(context, apkDownloadUrl);
       }
     } catch (e) {
@@ -38,7 +40,8 @@ class UpdaterService {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      // Renamed context to dialogContext to avoid shadowing
+      builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text("New VIP Update!"),
         content: const Text(
           "App ka naya version aa gaya hai. Abhi update karein.",
@@ -47,7 +50,7 @@ class UpdaterService {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               _downloadAndInstall(context, downloadUrl);
             },
             child: const Text(
@@ -83,6 +86,9 @@ class UpdaterService {
 
       OpenFilex.open(savePath);
     } catch (e) {
+      if (!context.mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Download failed: $e")));
     }
