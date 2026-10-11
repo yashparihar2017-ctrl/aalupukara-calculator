@@ -12,7 +12,8 @@ class CalculatorLogic {
         Expression exp = p.parse(finalExpr);
         ContextModel cm = ContextModel();
 
-        // Evaluate the expression
+        // Evaluate the expression (Ignore deprecation warning)
+        // ignore: deprecated_member_use
         double eval = exp.evaluate(EvaluationType.REAL, cm);
 
         // Agar result 5.0 hai toh usko 5 dikhane ke liye

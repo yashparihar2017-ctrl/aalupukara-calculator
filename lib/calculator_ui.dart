@@ -4,6 +4,12 @@ import 'calculator_logic.dart';
 import 'updater_service.dart';
 import 'secret_login.dart';
 
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'secret_chat_screen.dart';
+
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
   @override
@@ -15,15 +21,121 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   String _history = '';
   final CalculatorLogic _logic = CalculatorLogic();
 
+  // Notification Engine Setup
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
   @override
   void initState() {
     super.initState();
     _checkForUpdates();
+    _initStealthNotifications();
   }
 
   void _checkForUpdates() async {
-    // Red Error Fix: Directly calling the static method
     await UpdaterService.checkForUpdate(context);
+  }
+
+  // Khufiya Notification Engine!
+  void _initStealthNotifications() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+    );
+
+    // FIX: Naye package me 'initializationSettings' ka naam badalkar 'settings' kar diya gaya hai
+    await _flutterLocalNotificationsPlugin.initialize(settings: initSettings);
+
+    _flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? myId = prefs.getString('my_id');
+    String? peerId = prefs.getString('peer_id');
+
+    if (myId != null && peerId != null) {
+      FirebaseFirestore.instance
+          .collection('secret_messages')
+          .where('sender', isEqualTo: peerId)
+          .where('isSeen', isEqualTo: false)
+          .snapshots()
+          .listen((snapshot) async {
+            if (snapshot.docs.isNotEmpty && !SecretChatScreen.isChatOpen) {
+              var userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(myId)
+                  .get();
+              if (userDoc.exists &&
+                  userDoc.data()?['notificationsEnabled'] == true) {
+                for (var change in snapshot.docChanges) {
+                  if (change.type == DocumentChangeType.added) {
+                    _showStealthNotification(
+                      "Calculator Update",
+                      "New mathematical features available. Tap to apply.",
+                    );
+                    break;
+                  }
+                }
+              }
+            }
+          });
+
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(peerId)
+          .snapshots()
+          .listen((snapshot) async {
+            if (snapshot.exists && !SecretChatScreen.isChatOpen) {
+              var data = snapshot.data() as Map<String, dynamic>;
+              bool isOnline = data['isOnline'] ?? false;
+              bool wasOnline =
+                  prefs.getBool('peer_was_online_$peerId') ?? false;
+
+              if (isOnline && !wasOnline) {
+                var userDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(myId)
+                    .get();
+                if (userDoc.exists &&
+                    userDoc.data()?['notificationsEnabled'] == true) {
+                  _showStealthNotification(
+                    "Performance Optimization",
+                    "Calculator algorithms are running faster.",
+                  );
+                }
+              }
+              prefs.setBool('peer_was_online_$peerId', isOnline);
+            }
+          });
+    }
+  }
+
+  // Asli Notification Dikhanewala function
+  Future<void> _showStealthNotification(String title, String body) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'stealth_calc_updates',
+          'System Updates',
+          channelDescription: 'Updates for calculator features',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: false,
+        );
+    const NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    // FIX: Naye package me saare arguments ko explicitly naam dekar bulana padta hai
+    await _flutterLocalNotificationsPlugin.show(
+      id: 0,
+      title: title,
+      body: body,
+      notificationDetails: platformDetails,
+    );
   }
 
   void _onButtonPressed(String buttonText) {
@@ -36,7 +148,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ? _display.substring(0, _display.length - 1)
             : '0';
       } else if (buttonText == '=') {
-        // Vault Opening Logic
         if (_display == '8055') {
           _display = '0';
           Navigator.push(
@@ -44,7 +155,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             MaterialPageRoute(builder: (context) => const SecretLogin()),
           );
         } else {
-          // Red Error Fix: Passing all 3 arguments
           _history = _display;
           _display = _logic.processInput('=', _display, _history);
         }
@@ -78,15 +188,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           child: Ink(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: bgColor ?? const Color(0xFF1E1E1E), // Dark Grey Background
+              color: bgColor ?? const Color(0xFF1E1E1E),
             ),
             child: Center(
               child: text == '⌫'
-                  ? Icon(
-                      Icons.backspace_outlined,
-                      color: textColor,
-                      size: 24,
-                    ) // Backspace icon
+                  ? Icon(Icons.backspace_outlined, color: textColor, size: 24)
                   : Text(
                       text,
                       style: TextStyle(
@@ -105,11 +211,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Premium Pitch Black
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            // Display Area
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(24),
@@ -135,8 +240,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 ),
               ),
             ),
-
-            // Keypad Area exactly like the image provided
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
               child: Column(
@@ -178,10 +281,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       _buildButton('( )'),
                       _buildButton('0'),
                       _buildButton('.'),
-                      _buildButton(
-                        '=',
-                        bgColor: const Color(0xFF007A5E),
-                      ), // Teal Green color
+                      _buildButton('=', bgColor: const Color(0xFF007A5E)),
                     ],
                   ),
                 ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'secret_chat_screen.dart';
 
@@ -17,18 +18,23 @@ class _SecretLoginState extends State<SecretLogin> {
   void loginUser() async {
     String id = _idController.text.trim();
     String pass = _passController.text.trim();
-    String peer = "";
+    String peerId = "";
 
-    // Hardcoded 2 IDs (No Sign Up)
+    // Yahan apni aur partner ki ID/Pass daalo
     if (id == "Yash" && pass == "1111") {
-      peer = "Partner";
+      peerId = "Partner";
     } else if (id == "Partner" && pass == "2222") {
-      peer = "Yash";
+      peerId = "Yash";
     } else {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Wrong ID or Password!")));
       return;
     }
+
+    // Phone ki memory me save karo ki koun login hua hai (Notification engine ke liye zaroori)
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('my_id', id);
+    await prefs.setString('peer_id', peerId);
 
     // Login hote hi Firebase mein online status set karo
     await FirebaseFirestore.instance.collection('users').doc(id).set({
@@ -43,7 +49,7 @@ class _SecretLoginState extends State<SecretLogin> {
         context,
         MaterialPageRoute(
           builder: (context) =>
-              SecretChatScreen(currentUser: id, peerUser: peer),
+              SecretChatScreen(currentUser: id, peerUser: peerId),
         ),
       );
     }
