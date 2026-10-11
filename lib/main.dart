@@ -1,8 +1,48 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'calculator_ui.dart'; // Nayi UI file link ki hai
+import 'calculator_ui.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+
+  if (message.data['stealth_trigger'] == 'true') {
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(settings: initSettings);
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'stealth_calc_updates',
+          'System Updates',
+          channelDescription: 'Updates for calculator features',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: false,
+        );
+
+    const NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await flutterLocalNotificationsPlugin.show(
+      id: 0,
+      title: "Calculator Update",
+      body: "New mathematical features available. Tap to apply.",
+      notificationDetails: platformDetails,
+    );
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +63,9 @@ void main() async {
     } else {
       await Firebase.initializeApp();
     }
+
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
     runApp(const SecretApp());
   } catch (e) {
     runApp(

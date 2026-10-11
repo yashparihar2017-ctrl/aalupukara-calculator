@@ -10,6 +10,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'secret_chat_screen.dart';
 
+import 'dart:async'; // StreamSubscription ke liye add kiya
+
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
   @override
@@ -24,6 +26,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   // Notification Engine Setup
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  // Naye variables: Taaki double-double notification na aaye
+  StreamSubscription<QuerySnapshot>? _messageSubscription;
+  StreamSubscription<DocumentSnapshot>? _statusSubscription;
 
   @override
   void initState() {
@@ -44,9 +50,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       android: androidSettings,
     );
 
-    // FIX: Naye package me 'initializationSettings' ka naam badalkar 'settings' kar diya gaya hai
     await _flutterLocalNotificationsPlugin.initialize(settings: initSettings);
 
+    // Android 13+ Notification Permission
     _flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -58,7 +64,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     String? peerId = prefs.getString('peer_id');
 
     if (myId != null && peerId != null) {
-      FirebaseFirestore.instance
+      // Purane background processes ko band karo (taaki double notification na aaye)
+      _messageSubscription?.cancel();
+      _statusSubscription?.cancel();
+
+      // 1. Message Listener (Fake "Calculator Update" Alert)
+      _messageSubscription = FirebaseFirestore.instance
           .collection('secret_messages')
           .where('sender', isEqualTo: peerId)
           .where('isSeen', isEqualTo: false)
@@ -84,7 +95,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             }
           });
 
-      FirebaseFirestore.instance
+      // 2. Online Status Listener (Fake "Performance Optimization" Alert)
+      _statusSubscription = FirebaseFirestore.instance
           .collection('users')
           .doc(peerId)
           .snapshots()
@@ -129,7 +141,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       android: androidDetails,
     );
 
-    // FIX: Naye package me saare arguments ko explicitly naam dekar bulana padta hai
     await _flutterLocalNotificationsPlugin.show(
       id: 0,
       title: title,
@@ -150,10 +161,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       } else if (buttonText == '=') {
         if (_display == '8055') {
           _display = '0';
+          // Khufiya Chat khulne ka Code!
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const SecretLogin()),
-          );
+          ).then((_) {
+            // FIX: Chat se bahar aane ke baad notification engine wapas chalu hoga
+            _initStealthNotifications();
+          });
         } else {
           _history = _display;
           _display = _logic.processInput('=', _display, _history);

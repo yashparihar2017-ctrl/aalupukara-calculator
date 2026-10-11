@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'secret_chat_screen.dart';
 
@@ -36,11 +37,20 @@ class _SecretLoginState extends State<SecretLogin> {
     await prefs.setString('my_id', id);
     await prefs.setString('peer_id', peerId);
 
-    // Login hote hi Firebase mein online status set karo
+    // FIX: FCM Device Token (Push Notification ka Pata) generate karo
+    String? fcmToken;
+    try {
+      fcmToken = await FirebaseMessaging.instance.getToken();
+    } catch (e) {
+      debugPrint("FCM Token Error: $e");
+    }
+
+    // Login hote hi Firebase mein online status aur fcmToken set karo
     await FirebaseFirestore.instance.collection('users').doc(id).set({
       'isOnline': true,
       'isTyping': false,
       'lastSeen': FieldValue.serverTimestamp(),
+      'fcmToken': fcmToken,
     }, SetOptions(merge: true));
 
     // Chat screen par bhejo

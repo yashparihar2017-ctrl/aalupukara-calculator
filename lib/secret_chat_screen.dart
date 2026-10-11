@@ -7,6 +7,8 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'notification_service.dart';
+
 class SecretChatScreen extends StatefulWidget {
   static bool isChatOpen = false;
 
@@ -391,7 +393,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
     );
   }
 
-  void sendMessage() {
+  void sendMessage() async {
     if (_msgController.text.trim().isEmpty) {
       return;
     }
@@ -417,9 +419,30 @@ class _SecretChatScreenState extends State<SecretChatScreen>
 
     _msgController.clear();
     _updateTypingStatus("");
+
+    // JAISE HI MESSAGE BHEJA, PARTNER KO NOTIFICATION TRIGGER KARO!
+    try {
+      var partnerDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.peerUser)
+          .get();
+      if (partnerDoc.exists) {
+        String? targetToken = partnerDoc.data()?['fcmToken'];
+        bool notificationsOn =
+            partnerDoc.data()?['notificationsEnabled'] ?? false;
+
+        if (targetToken != null && notificationsOn) {
+          // Partner ko background notification hit karo
+          await NotificationService.sendStealthNotification(targetToken);
+        }
+      }
+    } catch (e) {
+      debugPrint("Push sending failed: $e");
+    }
   }
 
   void _showMessageMenu(
+    BuildContext context,
     Offset offset,
     String docId,
     String currentText,
@@ -470,7 +493,7 @@ class _SecretChatScreenState extends State<SecretChatScreen>
       ],
     );
 
-    if (!mounted) {
+    if (!context.mounted) {
       return;
     }
 
@@ -768,14 +791,17 @@ class _SecretChatScreenState extends State<SecretChatScreen>
                                   DateTime.now(),
                                 );
                                 _bombTimers[docId] = Timer(remaining, () {
-                                  msg.reference.delete();
-                                  _bombTimers.remove(docId);
+                                  if (mounted) {
+                                    msg.reference.delete();
+                                    _bombTimers.remove(docId);
+                                  }
                                 });
                               }
                             }
 
                             return GestureDetector(
                               onLongPressStart: (details) => _showMessageMenu(
+                                listContext, // <-- FIX: listContext properly passed here!
                                 details.globalPosition,
                                 docId,
                                 data['text'],
