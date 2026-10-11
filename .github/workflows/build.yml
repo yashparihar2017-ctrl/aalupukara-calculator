@@ -6,6 +6,10 @@ on:
       - main
       - master
 
+# Ye 2 line nayi add ki hain (Bot ko upload karne ki permission dene ke liye)
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -39,3 +43,6 @@ jobs:
           name: "Latest Secret Vault Update"
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
+```eof
+
+Isko VS Code me paste karke save karo aur GitHub par Push (Commit/Sync changes) kar do. Fir spinner dekho, is baar pakka green tick ✅ aayega aur Releases tab me tumhari nayi APK dikhegi! Fatafat check karke batao.
