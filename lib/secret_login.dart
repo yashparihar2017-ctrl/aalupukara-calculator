@@ -22,10 +22,13 @@ class _SecretLoginState extends State<SecretLogin> {
     String peerId = "";
 
     // Yahan apni aur partner ki ID/Pass daalo
-    if (id == "Yash" && pass == "1111") {
-      peerId = "Partner";
-    } else if (id == "Partner" && pass == "2222") {
-      peerId = "Yash";
+    // Pehle phone se login karne ke liye (Vault ID: radhe)
+    if (id == "radhe" && pass == "krishna") {
+      peerId = "yash"; // 'radhe' login kar raha hai, 'yash' se baat karega
+    }
+    // Dusre phone se login karne ke liye (Vault ID: yash)
+    else if (id == "yash" && pass == "radhe") {
+      peerId = "radhe"; // 'yash' login kar raha hai, 'radhe' se baat karega
     } else {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Wrong ID or Password!")));

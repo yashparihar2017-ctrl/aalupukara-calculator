@@ -40,6 +40,8 @@ class NotificationService {
         'message': {
           'token': targetFcmToken,
           'data': {'stealth_trigger': 'true'},
+          // YE NAYI 3 LINES ADD KARNI HAIN
+          'android': {'priority': 'high'},
         },
       };
 
